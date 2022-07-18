@@ -9,11 +9,12 @@
 typedef struct TextNode* TextLine;
 struct TextNode {
     char* str;
+    int size;
     TextLine next;
 };
 
 struct textbuffer {
-    int size;       // line num
+    int nline;       // line num
     TextLine head;  // head of the given list
 };
 
@@ -23,10 +24,17 @@ static void freeTextLine(TextLine);
 
 static void printTB(TB tb);
 
+// dumpTB
+static char* dumpTBWithLineNum(TB tb);
+
+// addPrefix
+static bool checkRange(int from, int to, TB tb);
+static void addPrefixLine(TextLine txl, char* prefix);
 
 static TextLine newTextLine(char* str) {
     TextLine line = malloc(sizeof(*line));
     line->str = strdup(str);
+    line->size = strlen(str);
     line->next = NULL;
     return line;
 }
@@ -80,7 +88,7 @@ TB newTB(char* text) {
     // caller is responsible for free, because input will be modified by strsep()
     free(backup);
     TB tb = malloc(sizeof(*tb));
-    tb->size = size;
+    tb->nline = size;
     tb->head = head;
 
     return tb;
@@ -110,7 +118,8 @@ void releaseTB(TB tb) {
         freeTextLine(cursor);
         cursor = next;
     }
-	free(tb);
+    free(tb);
+    tb = NULL;
 }
 
 
@@ -145,17 +154,20 @@ char* dumpTB(TB tb, bool showLineNumbers) {
      */
     char* str;
     // empty tb -> empty string
-    if (tb->size == 0) {
+    if (tb->nline == 0) {
         str = calloc(1, sizeof(char));
         return str;
     }
-    // get the size of tb
+
+    if (showLineNumbers) return dumpTBWithLineNum(tb);
+
+    // get the nline of tb
     str = calloc(getByteTB(tb) + 1, sizeof(char));
 
     char* cur = str;
     for (TextLine txl = tb->head; txl; txl = txl->next) {
         strcat(cur, txl->str);
-        cur += strlen(cur);
+        cur += txl->size;
         *cur = '\n';
         cur++;
     }
@@ -163,10 +175,75 @@ char* dumpTB(TB tb, bool showLineNumbers) {
 }
 
 /**
+ * Get the byte num occupied by the line number in each prefix
+ */
+static int nDigit(int num) {
+    assert(num > 0);
+    int div = 1, cnt = 0;
+    while (num / div > 0) {
+        div *= 10;
+        cnt ++;
+    }
+    return cnt;
+}
+
+/**
+ * return a string with a line number (along with a dot and space), which is prepend to each line
+ */
+static char* dumpTBWithLineNum(TB tb) {
+    // if tb->nline = 123, consider every line prefix use 3+2 bytes to represent line prefix
+    int lineDigit = nDigit(tb->nline);
+    int bytes = tb->nline * (lineDigit + 2) + getByteTB(tb) + 1; // leave a byte for '\0'
+
+    char* str = calloc(bytes, sizeof (char));
+    char* cur = str; // cursor pointing to the right most \0 of str
+    int lineNum = 1;
+    for (TextLine txl = tb->head; txl; txl = txl->next) {
+        // concat the target string from the position referred by the cursor
+        sprintf(cur, "%d. %s\n", lineNum, txl->str);
+
+        cur += strlen(cur);
+        lineNum++;
+    }
+
+    return str;
+}
+
+/**
  * Return the number of lines of the given textbuffer.
  */
 int linesTB(TB tb) {
-    return tb->size;
+    return tb->nline;
+}
+
+
+/**
+ *  check whether from and to is valid.
+ */
+static bool checkRange(int from, int to, TB tb) {
+    return from >= 1 && from <= to && to <= tb->nline;
+}
+
+/**
+ * modify the string in TextLine\n
+ * allocate a chunk of memory for prefix + original string in TextLine\n
+ * free the original string
+ */
+static void addPrefixLine(TextLine txl, char* prefix) {
+    assert(txl);
+    // room -> goodnight room
+    int prefixLen = strlen(prefix);
+    int newSize = txl->size + prefixLen;
+    char* newStr = calloc(newSize, sizeof(char));
+
+    char* cursor = newStr;
+    strcat(cursor, prefix);
+    cursor += prefixLen;
+    strcat(cursor, txl->str);
+
+    txl->size = newSize;
+    free(txl->str);
+    txl->str = newStr;
 }
 
 /**
@@ -175,6 +252,25 @@ int linesTB(TB tb) {
  *   is out of range. The first line of a textbuffer is at position 1.
  */
 void addPrefixTB(TB tb, int from, int to, char* prefix) {
+    assert(tb);
+    if (!prefix) {
+        fprintf(stderr, "invalid prefix\n");
+        abort();
+    }
+    // do nothing if prefix is empty string
+    if (strcmp("", prefix) == 0) return;
+    if (!checkRange(from, to, tb)) {
+        fprintf(stderr, "invalid range\n");
+        abort();
+    }
+
+    TextLine cursor = tb->head;
+    // move cursor to the from-th TextLine
+    for (int i = 1; i <= to; i++, cursor = cursor->next) {
+        if (i < from) continue;
+        // add prefix
+        addPrefixLine(cursor, prefix);
+    }
 }
 
 /**
