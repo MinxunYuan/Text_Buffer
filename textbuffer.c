@@ -328,6 +328,52 @@ Match searchTB(TB tb, char* search) {
  *   is out of range.
  */
 void deleteTB(TB tb, int from, int to) {
+    assert(tb);
+    // If to < from, abort
+    if (!checkRange(from, to, tb)) {
+        fprintf(stderr, "invalid range\n");
+        abort();
+    }
+    // delete TextLine and manage link
+    if (from == 1) {
+        // should back up head for free memory
+        TextLine txl = tb->head;
+        TextLine backup = txl;
+
+        // move txl (to-1) time, makes txl->next refer to the to-th TextLine
+        while (--to) txl = txl->next;
+        tb->head = txl->next;
+        txl->next = NULL;
+        freeTextLine(backup);
+    } else if (to == tb->nline) {
+        TextLine txl = tb->head;
+        // move txl to the (from-1)-th TextLine
+        from--;
+        while (--from) txl = txl->next;
+        TextLine backup = txl->next;
+        txl->next = NULL;
+        freeTextLine(backup);
+    } else {
+            // from !=1 and to != tb->nline
+            TextLine t1 = tb->head;
+            TextLine t2 = t1;
+            for (int i = 1; i < to - 1; i++) {
+                t2 = t2->next;
+                if (i >= from - 1) continue;
+                t1 = t1->next;
+            }
+            TextLine backup = t1->next;
+            if (t1 == t2) {
+                // from == to
+                t1->next = backup->next;
+                backup->next = NULL;
+            } else {
+                // from != to
+                t1->next = t2->next;
+                t2->next = NULL;
+            }
+            freeTextLine(backup);
+        }
 }
 
 /**
