@@ -284,6 +284,44 @@ void addPrefixTB(TB tb, int from, int to, char* prefix) {
  *   range.
  */
 void mergeTB(TB tb1, int pos, TB tb2) {
+    // Attempts to merge a textbuffer with itself should be ignored
+    if (tb1 == tb2 && pos == 1) return;
+    if (tb2->nline == 0) return;
+
+    if (pos < 1 || pos > tb1->nline + 1) {
+        fprintf(stderr, "pos is out of range\n");
+        abort();
+    }
+
+    if (pos == 1) {
+        // line 1 of tb2 -> line 1 of tb1
+        TextLine t1 = tb1->head;
+        TextLine t2 = tb2->head;
+
+        tb1->head = tb2->head;
+        // get the last TL of tb2
+        while (t2->next) t2 = t2->next;
+        t2->next = t1;
+    } else if (pos == tb1->nline + 1) {
+        // append tb2 to tb1
+        // get the last node of tb1
+        TextLine t1 = tb1->head;
+        while (t1->next) t1 = t1->next;
+        t1->next = tb2->head;
+    } else {
+        // normal case
+        TextLine t1 = tb1->head;
+        int cnt = pos - 1;
+        while (--cnt) t1 = t1->next;
+        TextLine t2 = t1->next;
+
+        t1->next = tb2->head;
+        while (t1->next) t1 = t1->next;
+        t1->next = t2;
+    }
+    tb1->nline += tb2->nline;
+    // free tb2, instead of calling releaseTB()
+    free(tb2);
 }
 
 /**
