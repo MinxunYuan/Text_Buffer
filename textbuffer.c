@@ -392,6 +392,14 @@ static void cloneTextLine(TextLine txl, TextLine* head, TextLine* tail) {
     }
 }
 
+
+static TB newEmptyTB() {
+    TB tb = malloc(sizeof(*tb));
+    tb->head = NULL;
+    tb->nline = 0;
+    return tb;
+}
+
 /**
  * Cut  the lines between and including 'from' and 'to' out of the given
  * textbuffer 'tb' into a new textbuffer.
@@ -401,7 +409,34 @@ static void cloneTextLine(TextLine txl, TextLine* head, TextLine* tail) {
  *   is out of range.
  */
 TB cutTB(TB tb, int from, int to) {
-    return NULL;
+    if (!checkRange(from, to, tb)) {
+        fprintf(stderr, "invalid range\n");
+        abort();
+    }
+
+    TB tbCut = newEmptyTB();
+    // get the (from-1)-th, to-th Line from tb
+    TextLine _from = tb->head;
+    TextLine _to = _from;
+    for (int i = 1; i < to; i++) {
+        if (i < from - 1) _from = _from->next;
+        _to = _to->next;
+    }
+
+    // cut from head
+    if (from == 1) {
+        tbCut->head = tb->head;
+        tb->head = _to->next;
+    } else {
+        tbCut->head = _from->next;
+        _from->next = _to->next;
+    }
+
+    _to->next = NULL;
+    tbCut->nline = to - from + 1;
+    tb->nline -= tbCut->nline;
+
+    return tbCut;
 }
 
 /**
