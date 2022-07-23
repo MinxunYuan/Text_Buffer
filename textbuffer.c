@@ -34,6 +34,9 @@ static void addPrefixLine(TextLine txl, char* prefix);
 // searchTB
 static Match matchNodeNew(int row, int col);
 
+// pastTB
+static void cloneTextLine(TextLine txl, TextLine* head, TextLine* tail);
+
 static TextLine newTextLine(char* str) {
     TextLine line = malloc(sizeof(*line));
     line->str = strdup(str);
@@ -338,6 +341,55 @@ void mergeTB(TB tb1, int pos, TB tb2) {
  *   range.
  */
 void pasteTB(TB tb1, int pos, TB tb2) {
+    if (pos < 1 || pos > tb1->nline + 1) {
+        fprintf(stderr, "invalid pos\n");
+        abort();
+    }
+    if (linesTB(tb2) == 0) return;
+
+    // back up 1st-line of tb1
+    TextLine headTB1 = tb1->head;
+    TextLine newLineTail = NULL;
+
+    // head
+    if (pos == 1) {
+        // tb1->head -> newly cloned TextLine
+        // newLineTail -> previous tb1->head
+        cloneTextLine(tb2->head, &(tb1->head), &newLineTail);
+        newLineTail->next = headTB1;
+    } else {
+        TextLine cur = headTB1;
+        // cur -> (pos-1)-th TextLine of tb1
+        for (int i = 1; i < pos - 1; i++)
+            cur = cur->next;
+
+        // pos-th TextLine of tb1
+        TextLine pos_tb1 = cur->next;
+        // clone tb2->head, whose head gonna be the pos-th TextLine of tb1, newLineTail->next gonna refer to the previous pos-th TextLine of tb1
+        cloneTextLine(tb2->head, &(cur->next), &newLineTail);
+        newLineTail->next = pos_tb1;
+    }
+    tb1->nline += tb2->nline;
+}
+/**
+ * Clone the TextLine\n
+ * Set the address of its head and tail nodes to TextLine* head, tail passed by caller\n
+ * Tail is guaranteed to be NULL
+ * @param txl the TextLine about to be cloned(malloced)
+ * @param head address of the head of the cloned TextLine, given by caller
+ * @param tail address of the tail of the cloned TextLine, given by caller
+ */
+static void cloneTextLine(TextLine txl, TextLine* head, TextLine* tail) {
+    while (txl) {
+        if ((*tail) == NULL) {
+            *head = newTextLine(txl->str);
+            *tail = *head;
+        } else {
+            (*tail)->next = newTextLine(txl->str);
+            (*tail) = (*tail)->next;
+        }
+        txl = txl->next;
+    }
 }
 
 /**
