@@ -31,6 +31,9 @@ static char* dumpTBWithLineNum(TB tb);
 static bool checkRange(int from, int to, TB tb);
 static void addPrefixLine(TextLine txl, char* prefix);
 
+// searchTB
+static Match matchNodeNew(int row, int col);
+
 static TextLine newTextLine(char* str) {
     TextLine line = malloc(sizeof(*line));
     line->str = strdup(str);
@@ -356,7 +359,55 @@ TB cutTB(TB tb, int from, int to) {
  * - The user is responsible for freeing the returned list.
  */
 Match searchTB(TB tb, char* search) {
-    return NULL;
+    if (!search) {
+        fprintf(stderr, "invalid search string\n");
+        abort();
+    }
+    // match list
+    Match head = NULL;
+    Match prev = head;
+
+    if (strcmp("", search) == 0) return head;
+    TextLine txl = tb->head;
+
+    // line and col num starts at 1
+    int cnt = 1;
+    int searchSize = strlen(search);
+
+    // search each line of tb, the matches must be returned in order of their appearance in the textbuffer
+    while (txl) {
+        char* str = txl->str;
+        char* cursor = str;
+
+        // search string can occur multiple times on the same line
+        while ((cursor = strstr(cursor, search)) != NULL) {
+            int lineNum = cnt;
+            int colNum = cursor - str + 1;
+
+            // the match should not overlap
+            cursor += searchSize;
+            // generate matchNode
+            Match mt = matchNodeNew(lineNum, colNum);
+            if (!head)
+                head = mt;
+            else
+                prev->next = mt;
+            // prev always refers to the recently appended node
+            prev = mt;
+        }
+        // next line
+        cnt++;
+        txl = txl->next;
+    }
+    return head;
+}
+
+static Match matchNodeNew(int lineNum, int colNum) {
+    Match node = malloc(sizeof(*node));
+    node->lineNumber = lineNum;
+    node->columnNumber = colNum;
+    node->next = NULL;
+    return node;
 }
 
 /**
